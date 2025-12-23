@@ -12,17 +12,10 @@ export async function register(req, res) {
     const { nik, nama, email, password, noHp, alamat } = req.body;
     
     // Validation
-    if (!nik || !nama || !email || !password) {
+    if (!nama || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'NIK, nama, email, dan password wajib diisi'
-      });
-    }
-
-    if (nik.length !== 16) {
-      return res.status(400).json({
-        success: false,
-        message: 'NIK harus 16 digit'
+        message: 'Nama, email, dan password wajib diisi'
       });
     }
 
@@ -33,22 +26,32 @@ export async function register(req, res) {
       });
     }
 
-    const db = getDatabase();
-
-    // Check if NIK already exists
-    let stmt = db.prepare('SELECT id FROM users WHERE nik = ?');
-    stmt.bind([nik]);
-    if (stmt.step()) {
-      stmt.free();
+    // Validate NIK only if provided
+    if (nik && nik.length !== 16) {
       return res.status(400).json({
         success: false,
-        message: 'NIK sudah terdaftar'
+        message: 'NIK harus 16 digit'
       });
     }
-    stmt.free();
+
+    const db = getDatabase();
+
+    // Check if NIK already exists (only if NIK is provided)
+    if (nik) {
+      let stmt = db.prepare('SELECT id FROM users WHERE nik = ?');
+      stmt.bind([nik]);
+      if (stmt.step()) {
+        stmt.free();
+        return res.status(400).json({
+          success: false,
+          message: 'NIK sudah terdaftar'
+        });
+      }
+      stmt.free();
+    }
 
     // Check if email already exists
-    stmt = db.prepare('SELECT id FROM users WHERE email = ?');
+    let stmt = db.prepare('SELECT id FROM users WHERE email = ?');
     stmt.bind([email]);
     if (stmt.step()) {
       stmt.free();
@@ -69,7 +72,7 @@ export async function register(req, res) {
     db.run(`
       INSERT INTO users (id, nik, nama, email, password, no_hp, alamat, role, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'user', ?, ?)
-    `, [userId, nik, nama, email, hashedPassword, noHp || null, alamat || null, now, now]);
+    `, [userId, nik || null, nama, email, hashedPassword, noHp || null, alamat || null, now, now]);
     
     saveDatabase();
 
@@ -82,7 +85,7 @@ export async function register(req, res) {
       data: {
         user: {
           id: userId,
-          nik,
+          nik: nik || null,
           nama,
           email,
           noHp: noHp || null,

@@ -60,7 +60,7 @@ function createTables() {
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
-      nik TEXT UNIQUE NOT NULL,
+      nik TEXT UNIQUE,
       nama TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,

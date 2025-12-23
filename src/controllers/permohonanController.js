@@ -380,8 +380,13 @@ export async function updateStatus(req, res) {
       });
     }
 
-    // Check if permohonan exists
-    let stmt = db.prepare('SELECT * FROM permohonan WHERE id = ?');
+    // Check if permohonan exists and get user_id
+    let stmt = db.prepare(`
+      SELECT p.*, l.nama as layanan_nama 
+      FROM permohonan p 
+      LEFT JOIN layanan l ON p.layanan_id = l.id 
+      WHERE p.id = ?
+    `);
     stmt.bind([id]);
     if (!stmt.step()) {
       stmt.free();
@@ -390,6 +395,7 @@ export async function updateStatus(req, res) {
         message: 'Permohonan tidak ditemukan'
       });
     }
+    const permohonan = stmt.getAsObject();
     stmt.free();
 
     const now = new Date().toISOString();
@@ -422,6 +428,27 @@ export async function updateStatus(req, res) {
     `, [id, status, catatan || null, req.user.nama, now]);
 
     saveDatabase();
+
+    // Send notification to user
+    const statusLabels = {
+      'diajukan': 'Diajukan',
+      'diverifikasi': 'Diverifikasi',
+      'diproses': 'Sedang Diproses',
+      'selesai': 'Selesai',
+      'ditolak': 'Ditolak'
+    };
+    
+    const notifType = status === 'selesai' ? 'success' : (status === 'ditolak' ? 'error' : 'info');
+    const notifTitle = `Permohonan ${statusLabels[status]}`;
+    const notifMessage = `Permohonan ${permohonan.layanan_nama} (${permohonan.no_registrasi}) telah ${statusLabels[status].toLowerCase()}${catatan ? `. Catatan: ${catatan}` : ''}`;
+    
+    createNotification(
+      permohonan.user_id,
+      notifTitle,
+      notifMessage,
+      notifType,
+      `/user/riwayat/${id}`
+    );
 
     res.json({
       success: true,
